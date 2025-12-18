@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends  # <-- añade Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -10,6 +10,7 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI  
 
 from collections import defaultdict
+from auth import get_current_user  # <-- importa la dependencia
 
 app = FastAPI(title="RAG Chatbot")
 
@@ -39,15 +40,6 @@ vectordb = Chroma(
 retriever = vectordb.as_retriever(search_kwargs={"k": 5})
 
 # 4. Prompt optimizado para español
-# prompt_template = """Actúa como un consultor experto en evaluación del impacto social, siguiendo las metodologías de la EVPA (European Venture Philanthropy Association), la guía AEF 2015 y el enfoque de la Cátedra de Impacto Social “Medir para Decidir”. 
-# Usa SOLO el siguiente contexto para responder en español, no inventes. Si la respuesta no está en el contexto, di claramente: "No aparece en los documentos proporcionados".
-
-# Contexto:
-# {context}
-
-# Pregunta: {question}
-
-# Respuesta:"""
 
 prompt_template = """Actúa como un consultor experto en evaluación del impacto social, siguiendo las metodologías de la EVPA (European Venture Philanthropy Association), la guía AEF 2015 y el enfoque de la Cátedra de Impacto Social “Medir para Decidir”.
 
@@ -86,12 +78,14 @@ qa_chain = RetrievalQA.from_chain_type(
 )
 
 @app.post("/chat")
-def chat(payload: Question):
+def chat(payload: Question, user = Depends(get_current_user)):
+    # user es el payload del JWT de Supabase
+    user_id = user["sub"]  # ID del usuario en Supabase
+
     out = qa_chain({"query": payload.question})
     answer = out["result"]
     docs = out.get("source_documents", [])
 
-    # Agrupar por archivo
     pages_by_file = defaultdict(set)
     for d in docs:
         meta = d.metadata or {}
@@ -102,31 +96,20 @@ def chat(payload: Question):
 
     sources = []
     for file_name, pages in pages_by_file.items():
-        # Ordenar y formatear páginas como "1, 3, 5"
-        page_list = sorted(p for p in pages if isinstance(p, int) or str(p).isdigit())
+        page_list = sorted(
+            p for p in pages if isinstance(p, int) or str(p).isdigit()
+        )
         page_str = ", ".join(str(p) for p in page_list)
-        sources.append({
-            "file": file_name,
-            "pages": page_str,
-        })
+        sources.append(
+            {
+                "file": file_name,
+                "pages": page_str,
+            }
+        )
 
     return {
         "answer": answer,
         "sources": sources,
+        # opcionalmente, para debug:
+        # "user_id": user_id,
     }
-
-#@app.post("/chat")
-#def chat(payload: Question):
-#    out = qa_chain({"query": payload.question})
-#    answer = out["result"]
-#    docs = out.get("source_documents", [])
-
-#    sources = []
-#    for d in docs:
-#        meta = d.metadata or {}
-#        sources.append({
-#            "file": meta.get("file_name", meta.get("source", "Unknown")),
-#            "page": meta.get("page_number", "Unknown"),
-#        })
-
-#    return {"answer": answer, "sources": sources}
