@@ -26,7 +26,7 @@ async def get_current_user(
             algorithms=[ALGORITHM],
             audience="authenticated",
         )
-        return payload  # contiene sub (id usuario), email, etc.
+        return payload  # contiene "sub" (id usuario), "email", etc.
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
