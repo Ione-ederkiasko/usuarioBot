@@ -1,0 +1,132 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import os
+
+from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI  
+
+from collections import defaultdict
+
+app = FastAPI(title="RAG Chatbot")
+
+# CORS para que el frontend en Netlify pueda conectarse
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cambiar por tu dominio Netlify luego
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+class Question(BaseModel):
+    question: str
+
+# 1. Embeddings (igual que en ingest.py)
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
+# 2. Cargar Chroma desde vector_db/
+vectordb = Chroma(
+    embedding_function=embeddings,
+    persist_directory="./vector_db",
+)
+
+# 3. Retriever (top 5 documentos más similares)
+retriever = vectordb.as_retriever(search_kwargs={"k": 5})
+
+# 4. Prompt optimizado para español
+# prompt_template = """Actúa como un consultor experto en evaluación del impacto social, siguiendo las metodologías de la EVPA (European Venture Philanthropy Association), la guía AEF 2015 y el enfoque de la Cátedra de Impacto Social “Medir para Decidir”. 
+# Usa SOLO el siguiente contexto para responder en español, no inventes. Si la respuesta no está en el contexto, di claramente: "No aparece en los documentos proporcionados".
+
+# Contexto:
+# {context}
+
+# Pregunta: {question}
+
+# Respuesta:"""
+
+prompt_template = """Actúa como un consultor experto en evaluación del impacto social, siguiendo las metodologías de la EVPA (European Venture Philanthropy Association), la guía AEF 2015 y el enfoque de la Cátedra de Impacto Social “Medir para Decidir”.
+
+Responde SIEMPRE en español. Usa el siguiente contexto como fuente principal de información, citándolo explícitamente cuando sea relevante. Si la respuesta no aparece en el contexto, puedes complementar con tus conocimientos generales, pero deja claro cuándo estás razonando más allá de los documentos.
+
+Si una pregunta requiere un dato muy específico que NO se pueda deducir del contexto ni de conocimiento general razonable, responde: 
+"No aparece explícitamente en los documentos proporcionados; a partir de la experiencia y buenas prácticas, se puede razonar lo siguiente: …"
+
+Contexto:
+{context}
+
+Pregunta: {question}
+
+Respuesta:"""
+
+PROMPT = PromptTemplate(
+    template=prompt_template, input_variables=["context", "question"]
+)
+
+# 5. LLM de Hugging Face (Llama 3.2, gratis)
+# Token de OpenRouter (gratis en openrouter.ai/keys)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+llm = ChatOpenAI(
+    model="mistralai/mistral-7b-instruct:free",  # Específicamente la versión gratis
+    temperature=0.1,
+    openai_api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1",
+)
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=retriever,
+    chain_type_kwargs={"prompt": PROMPT},
+    return_source_documents=True,
+)
+
+@app.post("/chat")
+def chat(payload: Question):
+    out = qa_chain({"query": payload.question})
+    answer = out["result"]
+    docs = out.get("source_documents", [])
+
+    # Agrupar por archivo
+    pages_by_file = defaultdict(set)
+    for d in docs:
+        meta = d.metadata or {}
+        file_name = meta.get("file_name", meta.get("source", "Unknown"))
+        page = meta.get("page_number")
+        if page is not None:
+            pages_by_file[file_name].add(page)
+
+    sources = []
+    for file_name, pages in pages_by_file.items():
+        # Ordenar y formatear páginas como "1, 3, 5"
+        page_list = sorted(p for p in pages if isinstance(p, int) or str(p).isdigit())
+        page_str = ", ".join(str(p) for p in page_list)
+        sources.append({
+            "file": file_name,
+            "pages": page_str,
+        })
+
+    return {
+        "answer": answer,
+        "sources": sources,
+    }
+
+#@app.post("/chat")
+#def chat(payload: Question):
+#    out = qa_chain({"query": payload.question})
+#    answer = out["result"]
+#    docs = out.get("source_documents", [])
+
+#    sources = []
+#    for d in docs:
+#        meta = d.metadata or {}
+#        sources.append({
+#            "file": meta.get("file_name", meta.get("source", "Unknown")),
+#            "page": meta.get("page_number", "Unknown"),
+#        })
+
+#    return {"answer": answer, "sources": sources}

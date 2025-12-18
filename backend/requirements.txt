@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+
+langchain==0.1.16
+langchain-community==0.0.32
+langchain-huggingface
+langchain-openai
+
+chromadb
+
+unstructured
+unstructured[pdf]
+
+sentence-transformers
+
+pydantic
+python-multipart
