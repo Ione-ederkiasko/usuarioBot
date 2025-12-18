@@ -1,6 +1,9 @@
 // src/components/AuthForm.tsx
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export function AuthForm({
   onAuth,
@@ -13,19 +16,18 @@ export function AuthForm({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
 
     try {
       if (mode === "register") {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
         });
         if (error) throw error;
-        // según config, te pedirá confirmar email
         alert("Revisa tu correo para confirmar el registro.");
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -44,51 +46,53 @@ export function AuthForm({
   };
 
   return (
-    <div className="max-w-sm mx-auto my-8">
-      <h2 className="text-xl font-bold mb-4">
-        {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="email"
-          required
-          placeholder="tu@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border px-2 py-1 rounded"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border px-2 py-1 rounded"
-        />
-        {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+      <Card className="w-full max-w-md p-4 space-y-4">
+        <h2 className="text-xl font-semibold">
+          {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <Input
+            type="email"
+            required
+            placeholder="tu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            type="password"
+            required
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          {errorMsg && (
+            <p className="text-sm text-red-500">{errorMsg}</p>
+          )}
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading
+              ? "Cargando..."
+              : mode === "login"
+              ? "Entrar"
+              : "Registrarme"}
+          </Button>
+        </form>
+
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-1 rounded"
+          type="button"
+          className="text-sm underline"
+          onClick={() =>
+            setMode(mode === "login" ? "register" : "login")
+          }
         >
-          {loading
-            ? "Cargando..."
-            : mode === "login"
-            ? "Entrar"
-            : "Registrarme"}
+          {mode === "login"
+            ? "¿No tienes cuenta? Regístrate"
+            : "¿Ya tienes cuenta? Inicia sesión"}
         </button>
-      </form>
-      <button
-        type="button"
-        className="mt-2 text-sm underline"
-        onClick={() =>
-          setMode(mode === "login" ? "register" : "login")
-        }
-      >
-        {mode === "login"
-          ? "¿No tienes cuenta? Regístrate"
-          : "¿Ya tienes cuenta? Inicia sesión"}
-      </button>
+      </Card>
     </div>
   );
 }
