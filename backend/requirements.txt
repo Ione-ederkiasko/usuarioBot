@@ -10,11 +10,13 @@ chromadb
 
 unstructured
 unstructured[pdf]
+pillow
 
 sentence-transformers
 
 pydantic
 python-multipart
-
+python-dotenv
 pyjwt
 
+supabase
