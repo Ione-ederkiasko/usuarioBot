@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends  # <-- añade Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
-from db import supabase
+#from db import supabase
 
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -181,5 +181,6 @@ def chat(payload: Question, user = Depends(get_current_user)):
         # opcionalmente, para debug:
         # "user_id": user_id,
     }
+
 
 
