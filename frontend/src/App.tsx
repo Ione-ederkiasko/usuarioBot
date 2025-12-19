@@ -23,6 +23,13 @@ type ConversationSummary = {
   created_at: string;
 };
 
+type Conversation = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  messages: Message[];
+};
+
 const API_BASE = "https://usuariobot-production.up.railway.app";
 
 function renderBold(text: string) {
@@ -43,7 +50,6 @@ function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
 
-  // === NUEVO: recuperar sesión y escuchar refrescos ===
   useEffect(() => {
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -66,7 +72,6 @@ function App() {
       subscription.unsubscribe();
     };
   }, []);
-  // ====================================================
 
   const handleSend = async () => {
     const question = input.trim();
@@ -136,7 +141,25 @@ function App() {
     }
   };
 
-  // cuando el usuario hace login o cambia el token, cargamos historial
+  // NUEVO: cargar una conversación concreta y mostrar sus mensajes
+  const loadConversationById = async (id: string) => {
+    if (!accessToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/conversations/${id}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!res.ok) return;
+      const data: { conversation?: Conversation } = await res.json();
+      if (data.conversation?.messages) {
+        setMessages(data.conversation.messages);
+      }
+    } catch (e) {
+      console.error("Error cargando conversación", e);
+    }
+  };
+
   useEffect(() => {
     if (accessToken) {
       loadConversations(accessToken);
@@ -171,9 +194,11 @@ function App() {
             </p>
           ) : (
             conversations.map((c) => (
-              <div
+              <button
                 key={c.id}
-                className="cursor-default rounded px-2 py-1 hover:bg-muted"
+                type="button"
+                onClick={() => loadConversationById(c.id)}
+                className="w-full text-left cursor-pointer rounded px-2 py-1 hover:bg-muted"
               >
                 <div className="font-medium truncate">
                   {c.title || "Sin título"}
@@ -181,7 +206,7 @@ function App() {
                 <div className="text-[10px] text-muted-foreground">
                   {new Date(c.created_at).toLocaleString()}
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
@@ -306,6 +331,7 @@ export default App;
 // import { Button } from "@/components/ui/button";
 // import { Card } from "@/components/ui/card";
 // import { AuthForm } from "@/components/AuthForm";
+// import { supabase } from "@/lib/supabaseClient";
 
 // type Source = {
 //   file: string;
@@ -342,8 +368,32 @@ export default App;
 //   const [input, setInput] = useState("");
 //   const [isLoading, setIsLoading] = useState(false);
 //   const [accessToken, setAccessToken] = useState<string | null>(null);
-
 //   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+
+//   // === NUEVO: recuperar sesión y escuchar refrescos ===
+//   useEffect(() => {
+//     const loadSession = async () => {
+//       const { data } = await supabase.auth.getSession();
+//       const token = data.session?.access_token || null;
+//       if (token) {
+//         setAccessToken(token);
+//       }
+//     };
+
+//     loadSession();
+
+//     const {
+//       data: { subscription },
+//     } = supabase.auth.onAuthStateChange((_event, session) => {
+//       const token = session?.access_token || null;
+//       setAccessToken(token);
+//     });
+
+//     return () => {
+//       subscription.unsubscribe();
+//     };
+//   }, []);
+//   // ====================================================
 
 //   const handleSend = async () => {
 //     const question = input.trim();
@@ -377,9 +427,7 @@ export default App;
 //       };
 
 //       setMessages((prev) => [...prev, assistantMsg]);
-
-//       // después de cada mensaje, recargamos el historial
-//       loadConversations(accessToken);
+//       await loadConversations(accessToken);
 //     } catch {
 //       setMessages((prev) => [
 //         ...prev,
@@ -415,7 +463,7 @@ export default App;
 //     }
 //   };
 
-//   // cuando el usuario hace login, cargamos historial
+//   // cuando el usuario hace login o cambia el token, cargamos historial
 //   useEffect(() => {
 //     if (accessToken) {
 //       loadConversations(accessToken);
@@ -425,7 +473,6 @@ export default App;
 //     }
 //   }, [accessToken]);
 
-//   // Si no hay token, mostramos pantalla de login/registro
 //   if (!accessToken) {
 //     return <AuthForm onAuth={setAccessToken} />;
 //   }
@@ -439,7 +486,7 @@ export default App;
 //           <Button
 //             variant="outline"
 //             size="xs"
-//             onClick={() => loadConversations(accessToken)}
+//             onClick={() => accessToken && loadConversations(accessToken)}
 //           >
 //             Recargar
 //           </Button>
