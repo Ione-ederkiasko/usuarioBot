@@ -11,7 +11,8 @@ from langchain_openai import ChatOpenAI
 
 from collections import defaultdict
 from auth import get_current_user  
-from db import save_conversation      # <-- añade esto
+from typing import List, Dict, Any
+from db import save_conversation, supabase  # si no lo tenías
 
 app = FastAPI(title="RAG Chatbot")
 
@@ -126,6 +127,39 @@ def chat(payload: Question, user = Depends(get_current_user)):
     }
 
 
+@app.get("/conversations")
+def list_conversations(user = Depends(get_current_user)):
+    user_id = user["sub"]
+
+    result = (
+        supabase.table("conversations")
+        .select("id, title, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    # result.data ya respeta RLS: solo tus filas
+    return {"conversations": result.data}
+
+
+@app.get("/conversations/{conversation_id}")
+def get_conversation(conversation_id: str, user = Depends(get_current_user)):
+    user_id = user["sub"]
+
+    result = (
+        supabase.table("conversations")
+        .select("id, title, messages, created_at")
+        .eq("user_id", user_id)
+        .eq("id", conversation_id)
+        .single()
+        .execute()
+    )
+
+    return {"conversation": result.data}
+
+
+
 # @app.post("/chat")
 # def chat(payload: Question, user = Depends(get_current_user)):
 #     # user es el payload del JWT de Supabase
@@ -162,6 +196,7 @@ def chat(payload: Question, user = Depends(get_current_user)):
 #         # opcionalmente, para debug:
 #         # "user_id": user_id,
 #     }
+
 
 
 
