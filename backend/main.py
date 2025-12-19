@@ -16,6 +16,10 @@ from db import supabase, upsert_conversation
 from pydantic import BaseModel
 from typing import Optional
 
+from fastapi import File, UploadFile
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 app = FastAPI(title="RAG Chatbot")
 
 origins = [
@@ -292,6 +296,35 @@ def delete_conversation(conversation_id: str, user = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return {"ok": True}
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...), user = Depends(get_current_user)):
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Solo se admiten PDFs")
+
+    # 1) Guardar el PDF en disco (por ejemplo en ./pdf_uploads)
+    os.makedirs("pdf_uploads", exist_ok=True)
+    file_path = os.path.join("pdf_uploads", file.filename)
+
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    # 2) Cargar y trocear el PDF
+    loader = PyPDFLoader(file_path)
+    docs = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=800,
+        chunk_overlap=150,
+    )
+    split_docs = splitter.split_documents(docs)
+
+    # 3) Añadir a tu Chroma existente
+    # vectordb es el mismo que usas arriba
+    vectordb.add_documents(split_docs)
+
+    return {"ok": True, "chunks_added": len(split_docs)}
 
 
 
