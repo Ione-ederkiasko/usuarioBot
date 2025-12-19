@@ -10,7 +10,8 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI  
 
 from collections import defaultdict
-from auth import get_current_user  # <-- importa la dependencia
+from auth import get_current_user  
+from db import save_conversation      # <-- añade esto
 
 app = FastAPI(title="RAG Chatbot")
 
@@ -85,8 +86,7 @@ qa_chain = RetrievalQA.from_chain_type(
 
 @app.post("/chat")
 def chat(payload: Question, user = Depends(get_current_user)):
-    # user es el payload del JWT de Supabase
-    user_id = user["sub"]  # ID del usuario en Supabase
+    user_id = user["sub"]
 
     out = qa_chain({"query": payload.question})
     answer = out["result"]
@@ -106,19 +106,63 @@ def chat(payload: Question, user = Depends(get_current_user)):
             p for p in pages if isinstance(p, int) or str(p).isdigit()
         )
         page_str = ", ".join(str(p) for p in page_list)
-        sources.append(
-            {
-                "file": file_name,
-                "pages": page_str,
-            }
-        )
+        sources.append({"file": file_name, "pages": page_str})
+
+    # ==== NUEVO: guardar conversación en Supabase ====
+    messages_to_save = [
+        {"role": "user", "content": payload.question},
+        {"role": "assistant", "content": answer, "sources": sources},
+    ]
+
+    try:
+        save_conversation(user_id, messages_to_save)
+    except Exception as e:
+        print("Error guardando conversación:", e)
+    # ================================================
 
     return {
         "answer": answer,
         "sources": sources,
-        # opcionalmente, para debug:
-        # "user_id": user_id,
     }
+
+
+# @app.post("/chat")
+# def chat(payload: Question, user = Depends(get_current_user)):
+#     # user es el payload del JWT de Supabase
+#     user_id = user["sub"]  # ID del usuario en Supabase
+
+#     out = qa_chain({"query": payload.question})
+#     answer = out["result"]
+#     docs = out.get("source_documents", [])
+
+#     pages_by_file = defaultdict(set)
+#     for d in docs:
+#         meta = d.metadata or {}
+#         file_name = meta.get("file_name", meta.get("source", "Unknown"))
+#         page = meta.get("page_number")
+#         if page is not None:
+#             pages_by_file[file_name].add(page)
+
+#     sources = []
+#     for file_name, pages in pages_by_file.items():
+#         page_list = sorted(
+#             p for p in pages if isinstance(p, int) or str(p).isdigit()
+#         )
+#         page_str = ", ".join(str(p) for p in page_list)
+#         sources.append(
+#             {
+#                 "file": file_name,
+#                 "pages": page_str,
+#             }
+#         )
+
+#     return {
+#         "answer": answer,
+#         "sources": sources,
+#         # opcionalmente, para debug:
+#         # "user_id": user_id,
+#     }
+
 
 
 
