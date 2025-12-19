@@ -233,6 +233,34 @@ function App() {
     }
   };
 
+  const handleUploadPdf = async (file: File) => {
+    if (!accessToken) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_BASE}/upload-pdf`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          // no poner Content-Type, la añade el navegador
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        console.error("Error subiendo PDF");
+        return;
+      }
+
+      const data = await res.json();
+      console.log("PDF subido, chunks añadidos:", data.chunks_added);
+    } catch (e) {
+      console.error("Error llamando a /upload-pdf", e);
+    }
+  };
+
   if (!accessToken) {
     return <AuthForm onAuth={setAccessToken} />;
   }
@@ -325,7 +353,22 @@ function App() {
       <Card className="flex-1 h-[80vh] flex flex-col overflow-hidden">
         <div className="border-b px-4 py-3 font-semibold flex justify-between items-center">
           <span>ImpactAI Bot</span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <label className="text-xs cursor-pointer border rounded px-2 py-1 hover:bg-muted">
+              Subir PDF
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleUploadPdf(file);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
             <Button
               variant="outline"
               size="sm"
@@ -445,7 +488,6 @@ function App() {
 }
 
 export default App;
-
 
 
 // // src/App.tsx
@@ -662,6 +704,27 @@ export default App;
 //     }
 //   };
 
+//   const handleDeleteConversation = async (id: string) => {
+//     if (!accessToken) return;
+//     try {
+//       await fetch(`${API_BASE}/conversations/${id}`, {
+//         method: "DELETE",
+//         headers: {
+//           Authorization: `Bearer ${accessToken}`,
+//         },
+//       });
+
+//       setConversations((prev) => prev.filter((c) => c.id !== id));
+
+//       if (currentConversationId === id) {
+//         setCurrentConversationId(null);
+//         setMessages([]);
+//       }
+//     } catch (e) {
+//       console.error("Error eliminando conversación", e);
+//     }
+//   };
+
 //   if (!accessToken) {
 //     return <AuthForm onAuth={setAccessToken} />;
 //   }
@@ -720,17 +783,27 @@ export default App;
 //                       </div>
 //                     </button>
 //                     {!isEditing && (
-//                       <Button
-//                         variant="ghost"
-//                         size="icon"
-//                         className="h-6 w-6 text-xs"
-//                         onClick={() => {
-//                           setEditingId(c.id);
-//                           setEditingTitle(c.title || "");
-//                         }}
-//                       >
-//                         ✏️
-//                       </Button>
+//                       <>
+//                         <Button
+//                           variant="ghost"
+//                           size="icon"
+//                           className="h-6 w-6 text-xs"
+//                           onClick={() => {
+//                             setEditingId(c.id);
+//                             setEditingTitle(c.title || "");
+//                           }}
+//                         >
+//                           ✏️
+//                         </Button>
+//                         <Button
+//                           variant="ghost"
+//                           size="icon"
+//                           className="h-6 w-6 text-xs text-red-600"
+//                           onClick={() => handleDeleteConversation(c.id)}
+//                         >
+//                           🗑️
+//                         </Button>
+//                       </>
 //                     )}
 //                   </div>
 //                 </div>
@@ -864,4 +937,3 @@ export default App;
 // }
 
 // export default App;
-
