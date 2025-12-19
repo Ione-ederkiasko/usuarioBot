@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from collections import defaultdict
 from auth import get_current_user  
 from typing import List, Dict, Any
-from db import save_conversation, supabase, upsert_conversation
+from db import supabase, upsert_conversation
 from pydantic import BaseModel
 from typing import Optional
 
@@ -221,6 +221,7 @@ def get_conversation(
 #         # opcionalmente, para debug:
 #         # "user_id": user_id,
 #     }
+
 
 
 
