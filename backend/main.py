@@ -2,8 +2,6 @@ from fastapi import FastAPI, Depends  # <-- añade Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
-#from db import supabase, get_or_create_conversation
-
 
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -84,63 +82,6 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={"prompt": PROMPT},
     return_source_documents=True,
 )
-# from datetime import datetime
-# from collections import defaultdict
-
-# @app.post("/chat")
-# def chat(payload: Question, user=Depends(get_current_user)):
-#     user_id = user["sub"]
-
-#     conversation = get_or_create_conversation(
-#         supabase,
-#         user_id,
-#         payload.conversation_id
-#     )
-
-#     messages = conversation.get("messages", [])
-
-#     out = qa_chain({"query": payload.question})
-#     answer = out["result"]
-#     docs = out.get("source_documents", [])
-
-#     pages_by_file = defaultdict(set)
-#     for d in docs:
-#         meta = d.metadata or {}
-#         file_name = meta.get("file_name", meta.get("source", "Unknown"))
-#         page = meta.get("page_number")
-#         if page is not None:
-#             pages_by_file[file_name].add(page)
-
-#     sources = [
-#         {
-#             "file": f,
-#             "pages": ", ".join(str(p) for p in sorted(pages))
-#         }
-#         for f, pages in pages_by_file.items()
-#     ]
-
-#     now = datetime.utcnow().isoformat()
-
-#     messages.extend([
-#         {"role": "user", "content": payload.question, "created_at": now},
-#         {
-#             "role": "assistant",
-#             "content": answer,
-#             "sources": sources,
-#             "created_at": now
-#         }
-#     ])
-
-#     supabase.table("conversations") \
-#         .update({"messages": messages}) \
-#         .eq("id", conversation["id"]) \
-#         .execute()
-
-#     return {
-#         "answer": answer,
-#         "sources": sources,
-#         "conversation_id": conversation["id"]
-#     }
 
 @app.post("/chat")
 def chat(payload: Question, user = Depends(get_current_user)):
@@ -178,6 +119,7 @@ def chat(payload: Question, user = Depends(get_current_user)):
         # opcionalmente, para debug:
         # "user_id": user_id,
     }
+
 
 
 
