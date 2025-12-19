@@ -143,8 +143,26 @@ def list_conversations(user = Depends(get_current_user)):
     return {"conversations": result.data}
 
 
+# @app.get("/conversations/{conversation_id}")
+# def get_conversation(conversation_id: str, user = Depends(get_current_user)):
+#     user_id = user["sub"]
+
+#     result = (
+#         supabase.table("conversations")
+#         .select("id, title, messages, created_at")
+#         .eq("user_id", user_id)
+#         .eq("id", conversation_id)
+#         .single()
+#         .execute()
+#     )
+
+#     return {"conversation": result.data}
+
 @app.get("/conversations/{conversation_id}")
-def get_conversation(conversation_id: str, user = Depends(get_current_user)):
+def get_conversation(
+    conversation_id: str = Path(...),
+    user = Depends(get_current_user),
+):
     user_id = user["sub"]
 
     result = (
@@ -157,8 +175,6 @@ def get_conversation(conversation_id: str, user = Depends(get_current_user)):
     )
 
     return {"conversation": result.data}
-
-
 
 # @app.post("/chat")
 # def chat(payload: Question, user = Depends(get_current_user)):
@@ -196,6 +212,7 @@ def get_conversation(conversation_id: str, user = Depends(get_current_user)):
 #         # opcionalmente, para debug:
 #         # "user_id": user_id,
 #     }
+
 
 
 
