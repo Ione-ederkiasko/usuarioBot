@@ -13,6 +13,8 @@ from collections import defaultdict
 from auth import get_current_user  
 from typing import List, Dict, Any
 from db import save_conversation, supabase  # si no lo tenías
+from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI(title="RAG Chatbot")
 
@@ -32,6 +34,7 @@ app.add_middleware(
 
 class Question(BaseModel):
     question: str
+    conversation_id: Optional[str] = None  # nuevo campo
 
 # 1. Embeddings (igual que en ingest.py)
 embeddings = HuggingFaceEmbeddings(
@@ -212,6 +215,7 @@ def get_conversation(
 #         # opcionalmente, para debug:
 #         # "user_id": user_id,
 #     }
+
 
 
 
