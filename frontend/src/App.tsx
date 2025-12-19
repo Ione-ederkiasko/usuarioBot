@@ -52,6 +52,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [statusMessage, setStatusMessage] = useState<string | null>(null); // NUEVO
 
   useEffect(() => {
     const loadSession = async () => {
@@ -240,24 +241,29 @@ function App() {
     formData.append("file", file);
 
     try {
+      setStatusMessage(`Subiendo "${file.name}"...`);
       const res = await fetch(`${API_BASE}/upload-pdf`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          // no poner Content-Type, la añade el navegador
         },
         body: formData,
       });
 
       if (!res.ok) {
         console.error("Error subiendo PDF");
+        setStatusMessage("Error al subir el PDF.");
         return;
       }
 
       const data = await res.json();
-      console.log("PDF subido, chunks añadidos:", data.chunks_added);
+      setStatusMessage(
+        `PDF "${file.name}" subido correctamente. Se han indexado ${data.chunks_added} fragmentos.`
+      );
+      setTimeout(() => setStatusMessage(null), 5000);
     } catch (e) {
       console.error("Error llamando a /upload-pdf", e);
+      setStatusMessage("Error al subir el PDF.");
     }
   };
 
@@ -392,6 +398,12 @@ function App() {
             </Button>
           </div>
         </div>
+
+        {statusMessage && (
+          <div className="px-4 py-2 text-xs text-emerald-800 bg-emerald-50 border-b border-emerald-200">
+            {statusMessage}
+          </div>
+        )}
 
         <div className="flex-1 px-4 py-3 overflow-y-auto">
           <div className="space-y-4">
@@ -725,6 +737,34 @@ export default App;
 //     }
 //   };
 
+//   const handleUploadPdf = async (file: File) => {
+//     if (!accessToken) return;
+
+//     const formData = new FormData();
+//     formData.append("file", file);
+
+//     try {
+//       const res = await fetch(`${API_BASE}/upload-pdf`, {
+//         method: "POST",
+//         headers: {
+//           Authorization: `Bearer ${accessToken}`,
+//           // no poner Content-Type, la añade el navegador
+//         },
+//         body: formData,
+//       });
+
+//       if (!res.ok) {
+//         console.error("Error subiendo PDF");
+//         return;
+//       }
+
+//       const data = await res.json();
+//       console.log("PDF subido, chunks añadidos:", data.chunks_added);
+//     } catch (e) {
+//       console.error("Error llamando a /upload-pdf", e);
+//     }
+//   };
+
 //   if (!accessToken) {
 //     return <AuthForm onAuth={setAccessToken} />;
 //   }
@@ -817,7 +857,22 @@ export default App;
 //       <Card className="flex-1 h-[80vh] flex flex-col overflow-hidden">
 //         <div className="border-b px-4 py-3 font-semibold flex justify-between items-center">
 //           <span>ImpactAI Bot</span>
-//           <div className="flex gap-2">
+//           <div className="flex gap-2 items-center">
+//             <label className="text-xs cursor-pointer border rounded px-2 py-1 hover:bg-muted">
+//               Subir PDF
+//               <input
+//                 type="file"
+//                 accept="application/pdf"
+//                 className="hidden"
+//                 onChange={(e) => {
+//                   const file = e.target.files?.[0];
+//                   if (file) {
+//                     handleUploadPdf(file);
+//                     e.target.value = "";
+//                   }
+//                 }}
+//               />
+//             </label>
 //             <Button
 //               variant="outline"
 //               size="sm"
