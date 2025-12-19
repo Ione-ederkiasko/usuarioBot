@@ -212,6 +212,27 @@ function App() {
     }
   };
 
+  const handleDeleteConversation = async (id: string) => {
+    if (!accessToken) return;
+    try {
+      await fetch(`${API_BASE}/conversations/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
+    } catch (e) {
+      console.error("Error eliminando conversación", e);
+    }
+  };
+
   if (!accessToken) {
     return <AuthForm onAuth={setAccessToken} />;
   }
@@ -270,17 +291,27 @@ function App() {
                       </div>
                     </button>
                     {!isEditing && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-xs"
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditingTitle(c.title || "");
-                        }}
-                      >
-                        ✏️
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-xs"
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditingTitle(c.title || "");
+                          }}
+                        >
+                          ✏️
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-xs text-red-600"
+                          onClick={() => handleDeleteConversation(c.id)}
+                        >
+                          🗑️
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -416,6 +447,7 @@ function App() {
 export default App;
 
 
+
 // // src/App.tsx
 // import { useEffect, useState } from "react";
 // import { Input } from "@/components/ui/input";
@@ -468,6 +500,8 @@ export default App;
 //   const [accessToken, setAccessToken] = useState<string | null>(null);
 //   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
 //   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+//   const [editingId, setEditingId] = useState<string | null>(null);
+//   const [editingTitle, setEditingTitle] = useState("");
 
 //   useEffect(() => {
 //     const loadSession = async () => {
@@ -554,7 +588,7 @@ export default App;
 //         },
 //         body: JSON.stringify({
 //           question,
-//           conversation_id: currentConversationId, // usa el hilo actual (o null)
+//           conversation_id: currentConversationId,
 //         }),
 //       });
 
@@ -576,7 +610,6 @@ export default App;
 
 //       setMessages((prev) => [...prev, assistantMsg]);
 
-//       // si es hilo nuevo, el backend devolverá el id
 //       if (data.conversation_id) {
 //         setCurrentConversationId(data.conversation_id);
 //       }
@@ -599,6 +632,33 @@ export default App;
 //     if (e.key === "Enter" && !e.shiftKey) {
 //       e.preventDefault();
 //       handleSend();
+//     }
+//   };
+
+//   const handleRename = async (id: string) => {
+//     if (!accessToken) return;
+//     const newTitle = editingTitle.trim();
+//     if (!newTitle) {
+//       setEditingId(null);
+//       return;
+//     }
+//     try {
+//       await fetch(`${API_BASE}/conversations/${id}/title`, {
+//         method: "PUT",
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: `Bearer ${accessToken}`,
+//         },
+//         body: JSON.stringify({ title: newTitle }),
+//       });
+
+//       setConversations((prev) =>
+//         prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+//       );
+//     } catch (e) {
+//       console.error("Error renombrando conversación", e);
+//     } finally {
+//       setEditingId(null);
 //     }
 //   };
 
@@ -626,23 +686,56 @@ export default App;
 //               Aún no hay conversaciones.
 //             </p>
 //           ) : (
-//             conversations.map((c) => (
-//               <button
-//                 key={c.id}
-//                 type="button"
-//                 onClick={() => loadConversationById(c.id)}
-//                 className={`w-full text-left cursor-pointer rounded px-2 py-1 hover:bg-muted ${
-//                   currentConversationId === c.id ? "bg-muted" : ""
-//                 }`}
-//               >
-//                 <div className="font-medium truncate">
-//                   {c.title || "Sin título"}
+//             conversations.map((c) => {
+//               const isEditing = editingId === c.id;
+//               return (
+//                 <div key={c.id} className="space-y-1">
+//                   <div className="flex items-center gap-1">
+//                     <button
+//                       type="button"
+//                       onClick={() => loadConversationById(c.id)}
+//                       className={`flex-1 text-left cursor-pointer rounded px-2 py-1 hover:bg-muted ${
+//                         currentConversationId === c.id ? "bg-muted" : ""
+//                       }`}
+//                     >
+//                       <div className="font-medium truncate">
+//                         {isEditing ? (
+//                           <Input
+//                             autoFocus
+//                             value={editingTitle}
+//                             onChange={(e) => setEditingTitle(e.target.value)}
+//                             onKeyDown={(e) => {
+//                               if (e.key === "Enter") handleRename(c.id);
+//                               if (e.key === "Escape") setEditingId(null);
+//                             }}
+//                             onBlur={() => handleRename(c.id)}
+//                             className="h-6 text-xs"
+//                           />
+//                         ) : (
+//                           c.title || "Sin título"
+//                         )}
+//                       </div>
+//                       <div className="text-[10px] text-muted-foreground">
+//                         {new Date(c.created_at).toLocaleString()}
+//                       </div>
+//                     </button>
+//                     {!isEditing && (
+//                       <Button
+//                         variant="ghost"
+//                         size="icon"
+//                         className="h-6 w-6 text-xs"
+//                         onClick={() => {
+//                           setEditingId(c.id);
+//                           setEditingTitle(c.title || "");
+//                         }}
+//                       >
+//                         ✏️
+//                       </Button>
+//                     )}
+//                   </div>
 //                 </div>
-//                 <div className="text-[10px] text-muted-foreground">
-//                   {new Date(c.created_at).toLocaleString()}
-//                 </div>
-//               </button>
-//             ))
+//               );
+//             })
 //           )}
 //         </div>
 //       </Card>
@@ -656,7 +749,6 @@ export default App;
 //               variant="outline"
 //               size="sm"
 //               onClick={() => {
-//                 // empezar un hilo nuevo
 //                 setCurrentConversationId(null);
 //                 setMessages([]);
 //               }}
