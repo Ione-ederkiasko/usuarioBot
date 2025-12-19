@@ -50,6 +50,8 @@ function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   useEffect(() => {
     const loadSession = async () => {
@@ -136,7 +138,7 @@ function App() {
         },
         body: JSON.stringify({
           question,
-          conversation_id: currentConversationId, // usa el hilo actual (o null)
+          conversation_id: currentConversationId,
         }),
       });
 
@@ -158,7 +160,6 @@ function App() {
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // si es hilo nuevo, el backend devolverá el id
       if (data.conversation_id) {
         setCurrentConversationId(data.conversation_id);
       }
@@ -181,6 +182,33 @@ function App() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  const handleRename = async (id: string) => {
+    if (!accessToken) return;
+    const newTitle = editingTitle.trim();
+    if (!newTitle) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await fetch(`${API_BASE}/conversations/${id}/title`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+      );
+    } catch (e) {
+      console.error("Error renombrando conversación", e);
+    } finally {
+      setEditingId(null);
     }
   };
 
@@ -208,23 +236,56 @@ function App() {
               Aún no hay conversaciones.
             </p>
           ) : (
-            conversations.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => loadConversationById(c.id)}
-                className={`w-full text-left cursor-pointer rounded px-2 py-1 hover:bg-muted ${
-                  currentConversationId === c.id ? "bg-muted" : ""
-                }`}
-              >
-                <div className="font-medium truncate">
-                  {c.title || "Sin título"}
+            conversations.map((c) => {
+              const isEditing = editingId === c.id;
+              return (
+                <div key={c.id} className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => loadConversationById(c.id)}
+                      className={`flex-1 text-left cursor-pointer rounded px-2 py-1 hover:bg-muted ${
+                        currentConversationId === c.id ? "bg-muted" : ""
+                      }`}
+                    >
+                      <div className="font-medium truncate">
+                        {isEditing ? (
+                          <Input
+                            autoFocus
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleRename(c.id);
+                              if (e.key === "Escape") setEditingId(null);
+                            }}
+                            onBlur={() => handleRename(c.id)}
+                            className="h-6 text-xs"
+                          />
+                        ) : (
+                          c.title || "Sin título"
+                        )}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(c.created_at).toLocaleString()}
+                      </div>
+                    </button>
+                    {!isEditing && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-xs"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditingTitle(c.title || "");
+                        }}
+                      >
+                        ✏️
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {new Date(c.created_at).toLocaleString()}
-                </div>
-              </button>
-            ))
+              );
+            })
           )}
         </div>
       </Card>
@@ -238,7 +299,6 @@ function App() {
               variant="outline"
               size="sm"
               onClick={() => {
-                // empezar un hilo nuevo
                 setCurrentConversationId(null);
                 setMessages([]);
               }}
@@ -356,7 +416,6 @@ function App() {
 export default App;
 
 
-
 // // src/App.tsx
 // import { useEffect, useState } from "react";
 // import { Input } from "@/components/ui/input";
@@ -408,6 +467,7 @@ export default App;
 //   const [isLoading, setIsLoading] = useState(false);
 //   const [accessToken, setAccessToken] = useState<string | null>(null);
 //   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+//   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
 //   useEffect(() => {
 //     const loadSession = async () => {
@@ -432,6 +492,50 @@ export default App;
 //     };
 //   }, []);
 
+//   const loadConversations = async (token: string) => {
+//     try {
+//       const res = await fetch(`${API_BASE}/conversations`, {
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//         },
+//       });
+//       if (!res.ok) return;
+//       const data: { conversations?: ConversationSummary[] } = await res.json();
+//       setConversations(data.conversations ?? []);
+//     } catch (e) {
+//       console.error("Error cargando conversaciones", e);
+//     }
+//   };
+
+//   const loadConversationById = async (id: string) => {
+//     if (!accessToken) return;
+//     try {
+//       const res = await fetch(`${API_BASE}/conversations/${id}`, {
+//         headers: {
+//           Authorization: `Bearer ${accessToken}`,
+//         },
+//       });
+//       if (!res.ok) return;
+//       const data: { conversation?: Conversation } = await res.json();
+//       if (data.conversation?.messages) {
+//         setMessages(data.conversation.messages);
+//         setCurrentConversationId(id);
+//       }
+//     } catch (e) {
+//       console.error("Error cargando conversación", e);
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (accessToken) {
+//       loadConversations(accessToken);
+//     } else {
+//       setConversations([]);
+//       setMessages([]);
+//       setCurrentConversationId(null);
+//     }
+//   }, [accessToken]);
+
 //   const handleSend = async () => {
 //     const question = input.trim();
 //     if (!question || isLoading || !accessToken) return;
@@ -448,14 +552,21 @@ export default App;
 //           "Content-Type": "application/json",
 //           Authorization: `Bearer ${accessToken}`,
 //         },
-//         body: JSON.stringify({ question }),
+//         body: JSON.stringify({
+//           question,
+//           conversation_id: currentConversationId, // usa el hilo actual (o null)
+//         }),
 //       });
 
 //       if (!res.ok) {
 //         throw new Error("Error en la API");
 //       }
 
-//       const data: { answer: string; sources?: Source[] } = await res.json();
+//       const data: {
+//         answer: string;
+//         sources?: Source[];
+//         conversation_id?: string;
+//       } = await res.json();
 
 //       const assistantMsg: Message = {
 //         role: "assistant",
@@ -464,6 +575,12 @@ export default App;
 //       };
 
 //       setMessages((prev) => [...prev, assistantMsg]);
+
+//       // si es hilo nuevo, el backend devolverá el id
+//       if (data.conversation_id) {
+//         setCurrentConversationId(data.conversation_id);
+//       }
+
 //       await loadConversations(accessToken);
 //     } catch {
 //       setMessages((prev) => [
@@ -484,49 +601,6 @@ export default App;
 //       handleSend();
 //     }
 //   };
-
-//   const loadConversations = async (token: string) => {
-//     try {
-//       const res = await fetch(`${API_BASE}/conversations`, {
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//         },
-//       });
-//       if (!res.ok) return;
-//       const data: { conversations?: ConversationSummary[] } = await res.json();
-//       setConversations(data.conversations ?? []);
-//     } catch (e) {
-//       console.error("Error cargando conversaciones", e);
-//     }
-//   };
-
-//   // NUEVO: cargar una conversación concreta y mostrar sus mensajes
-//   const loadConversationById = async (id: string) => {
-//     if (!accessToken) return;
-//     try {
-//       const res = await fetch(`${API_BASE}/conversations/${id}`, {
-//         headers: {
-//           Authorization: `Bearer ${accessToken}`,
-//         },
-//       });
-//       if (!res.ok) return;
-//       const data: { conversation?: Conversation } = await res.json();
-//       if (data.conversation?.messages) {
-//         setMessages(data.conversation.messages);
-//       }
-//     } catch (e) {
-//       console.error("Error cargando conversación", e);
-//     }
-//   };
-
-//   useEffect(() => {
-//     if (accessToken) {
-//       loadConversations(accessToken);
-//     } else {
-//       setConversations([]);
-//       setMessages([]);
-//     }
-//   }, [accessToken]);
 
 //   if (!accessToken) {
 //     return <AuthForm onAuth={setAccessToken} />;
@@ -557,7 +631,9 @@ export default App;
 //                 key={c.id}
 //                 type="button"
 //                 onClick={() => loadConversationById(c.id)}
-//                 className="w-full text-left cursor-pointer rounded px-2 py-1 hover:bg-muted"
+//                 className={`w-full text-left cursor-pointer rounded px-2 py-1 hover:bg-muted ${
+//                   currentConversationId === c.id ? "bg-muted" : ""
+//                 }`}
 //               >
 //                 <div className="font-medium truncate">
 //                   {c.title || "Sin título"}
@@ -575,16 +651,30 @@ export default App;
 //       <Card className="flex-1 h-[80vh] flex flex-col overflow-hidden">
 //         <div className="border-b px-4 py-3 font-semibold flex justify-between items-center">
 //           <span>ImpactAI Bot</span>
-//           <Button
-//             variant="outline"
-//             size="sm"
-//             onClick={() => {
-//               setAccessToken(null);
-//               setMessages([]);
-//             }}
-//           >
-//             Cerrar sesión
-//           </Button>
+//           <div className="flex gap-2">
+//             <Button
+//               variant="outline"
+//               size="sm"
+//               onClick={() => {
+//                 // empezar un hilo nuevo
+//                 setCurrentConversationId(null);
+//                 setMessages([]);
+//               }}
+//             >
+//               Nuevo hilo
+//             </Button>
+//             <Button
+//               variant="outline"
+//               size="sm"
+//               onClick={() => {
+//                 setAccessToken(null);
+//                 setMessages([]);
+//                 setCurrentConversationId(null);
+//               }}
+//             >
+//               Cerrar sesión
+//             </Button>
+//           </div>
 //         </div>
 
 //         <div className="flex-1 px-4 py-3 overflow-y-auto">
