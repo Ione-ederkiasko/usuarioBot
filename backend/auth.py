@@ -6,8 +6,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-# Tu URL de Supabase, p.ej. https://xyzcompany.supabase.co
-SUPABASE_URL = https://turmfsgvzopagwogoxty.supabase.co
+SUPABASE_URL = SUPABASE_URL = os.getenv("SUPABASE_URL")
 
 security = HTTPBearer(auto_error=False)
 
