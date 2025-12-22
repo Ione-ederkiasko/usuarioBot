@@ -346,14 +346,12 @@ async def upload_excel(
     file: UploadFile = File(...),
     user = Depends(get_current_user),
 ):
-    # 1) Validar tipo de archivo
     if file.content_type not in (
         "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ):
-        raise HTTPException(status_code=400, detail="Solo se admiten archivos Excel")
+        raise HTTPException(status_code=400, detail=f"Tipo no soportado: {file.content_type}")
 
-    # 2) Guardar el Excel en disco
     os.makedirs("excel_uploads", exist_ok=True)
     file_path = os.path.join("excel_uploads", file.filename)
 
@@ -361,30 +359,27 @@ async def upload_excel(
     with open(file_path, "wb") as f:
         f.write(contents)
 
-    # 3) Cargar y trocear el Excel
-    # UnstructuredExcelLoader funciona bien en modo "elements"
-    loader = UnstructuredExcelLoader(file_path, mode="elements")
-    docs = loader.load()
+    try:
+        loader = UnstructuredExcelLoader(file_path, mode="elements")
+        docs = loader.load()
+    except Exception as e:
+        print("Error cargando Excel:", e)
+        raise HTTPException(status_code=500, detail=f"Error cargando Excel: {e}")
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=150,
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     split_docs = splitter.split_documents(docs)
 
-    # 4) Normalizar metadata para que /chat pueda construir 'Fuentes'
     for d in split_docs:
         meta = d.metadata or {}
-        # nombre de archivo amigable
         meta.setdefault("file_name", os.path.basename(meta.get("source", file_path)))
-        # no hay páginas, pero ponemos 1 por defecto (o podrías usar índice de fila, hoja, etc.)
         meta.setdefault("page_number", 1)
         d.metadata = meta
 
-    # 5) Añadir a tu Chroma existente
     vectordb.add_documents(split_docs)
 
     return {"ok": True, "chunks_added": len(split_docs)}
+
+
 
 
 
