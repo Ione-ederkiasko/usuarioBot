@@ -293,7 +293,8 @@ function App() {
       });
 
       if (!res.ok) {
-        console.error("Error subiendo Excel");
+        const text = await res.text();          // NUEVO
+        console.error("upload-excel error:", res.status, text);
         setAutoClearingStatus("Error al subir el Excel.");
         return;
       }
@@ -1062,5 +1063,6 @@ export default App;
 // }
 
 // export default App;
+
 
 
