@@ -21,6 +21,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import UnstructuredExcelLoader
 from collections.abc import Mapping
+from langchain_community.document_loaders import WebBaseLoader  # [web:349]
 
 app = FastAPI(title="RAG Chatbot")
 
@@ -396,45 +397,43 @@ async def upload_excel(
 
     return {"ok": True, "chunks_added": len(split_docs)}
 
-# @app.post("/upload-excel")
-# async def upload_excel(
-#     file: UploadFile = File(...),
-#     user = Depends(get_current_user),
-# ):
-#     if file.content_type not in (
-#         "application/vnd.ms-excel",
-#         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-#     ):
-#         raise HTTPException(status_code=400, detail=f"Tipo no soportado: {file.content_type}")
+class UrlPayload(BaseModel):
+    url: str
 
-#     os.makedirs("excel_uploads", exist_ok=True)
-#     file_path = os.path.join("excel_uploads", file.filename)
+@app.post("/upload-url")
+async def upload_url(payload: UrlPayload, user = Depends(get_current_user)):
+    url = payload.url.strip()
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="La URL debe empezar por http:// o https://")
 
-#     contents = await file.read()
-#     with open(file_path, "wb") as f:
-#         f.write(contents)
+    try:
+      loader = WebBaseLoader(url)
+      docs = loader.load()  # descarga y parsea la página [web:344][web:349]
+    except Exception as e:
+      print("Error cargando URL:", e)
+      raise HTTPException(status_code=500, detail=f"Error cargando URL: {e}")
 
-#     try:
-#         loader = UnstructuredExcelLoader(file_path, mode="elements")
-#         docs = loader.load()
-#     except Exception as e:
-#         print("Error cargando Excel:", e)
-#         raise HTTPException(status_code=500, detail=f"Error cargando Excel: {e}")
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=800,
+        chunk_overlap=150,
+    )
+    split_docs = splitter.split_documents(docs)
 
-#     splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
-#     split_docs = splitter.split_documents(docs)
+    def sanitize_value(v):
+        if isinstance(v, (str, int, float, bool)) or v is None:
+            return v
+        return str(v)
 
-#     for d in split_docs:
-#         meta = d.metadata or {}
-#         meta.setdefault("file_name", os.path.basename(meta.get("source", file_path)))
-#         meta.setdefault("page_number", 1)
-#         d.metadata = meta
+    for d in split_docs:
+        meta = d.metadata or {}
+        meta.setdefault("file_name", url)      # para que salga como fuente
+        meta.setdefault("page_number", 1)
+        meta = {k: sanitize_value(v) for k, v in meta.items()}
+        d.metadata = meta
 
-#     vectordb.add_documents(split_docs)
+    vectordb.add_documents(split_docs)
 
-#     return {"ok": True, "chunks_added": len(split_docs)}
-
-
+    return {"ok": True, "chunks_added": len(split_docs)}
 
 
 
